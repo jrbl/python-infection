@@ -30,7 +30,7 @@ class User(object):
         User.AllUserCount += 1        # XXX: Not Thread Safe
         self.__id = User.AllUserCount # XXX: Still not thread safe
         self.features = set()
-        self.coaching = set()
+        self.__coaching = set()
         self.__coached_by = set()
 
     def add_coach(self, coach):
@@ -38,21 +38,39 @@ class User(object):
         
         If coach is an iterable, every member will be added.
         It is an error to add a coach which is not a User."""
-        def add_with_check(coach):
-            if isinstance(coach, User):
-                self.__coached_by.add(coach)
-                coach.coaching.add(self)
+        self._add_user(coach, '_User__coached_by', '_User__coaching')
+
+    def add_student(self, student):
+        """Symmetrically add coaching to us and coached_by to them.
+        
+        If student is an iterable, every member will be added.
+        It is an error to add a student which is not a User."""
+        self._add_user(student, '_User__coaching', '_User__coached_by')
+
+    def _add_user(self, userish, ourtarget, theirtarget):
+        def add_with_check(userish):
+            if isinstance(userish, User):
+                v = getattr(self, ourtarget)
+                v.add(userish)
+                setattr(self, ourtarget, v)
+                v = getattr(userish, theirtarget)
+                v.add(self)
+                setattr(userish, theirtarget, v)
             else:
                 raise TypeError, "Only Users can be coaches."
-        if isinstance(coach, Iterable):
-            for c in coach:
-                add_with_check(c)
+        if isinstance(userish, Iterable):
+            for u in userish:
+                add_with_check(u)
         else:
-            add_with_check(coach)
+            add_with_check(userish)
 
     def coaches(self):
         """Return the set of coaches this user is coached_by"""
         return self.__coached_by
+
+    def students(self):
+        """Return the set of students this user is coaching"""
+        return self.__coaching
 
     def __hash__(self):
         return self.__id

@@ -32,8 +32,8 @@ class UserTestCase(unittest.TestCase):
         A = User()
         B = User()
         B.add_coach(A)
-        self.assertEqual(B._User__coached_by, set([A]))
-        self.assertEqual(A.coaching, set([B]))
+        self.assertEqual(B.coaches(), set([A]))
+        self.assertEqual(A.students(), set([B]))
 
     def test_add_coach_iterative(self):
         """Using student.add_coach() with a list of coaches updates everybody."""
@@ -42,7 +42,7 @@ class UserTestCase(unittest.TestCase):
         A.add_coach(coaches)
         self.assertEqual(A._User__coached_by, set(coaches))
         for c in coaches:
-            self.assertEqual(c.coaching, set([A]))
+            self.assertEqual(c.students(), set([A]))
 
     def test_add_coach_breaks_without_user(self):
         A = User()
