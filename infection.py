@@ -1,21 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright 2014 Joseph Blaylock <jrbl@jrbl.org>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Implement total_infection() and local_infection() for User objects"""
+
 
 from math import ceil
 import random
 
-def pick_small_N(proportion, pop_size):
-    """Select a small random number roughly proportionate to pop_size with ratio proportion.
-    
-    proportion is a floating point value between 0 and 1
-    pop_size is an integer >= 1
-    """
-    range_end = int(proportion * pop_size)
-    if range_end == 0:
-        return 0
-    if range_end < 2:
-        return 1
-    return random.randint(1, range_end)
+from user import User
+
 
 def select_N_of(population, count):
     """Return a set of size count members selected from population"""
@@ -25,30 +30,21 @@ def select_N_of(population, count):
     return set(random.sample(population, count))
 
 def random_small_sample(population, odds):
-    """Select a small number of individuals from population with probability of odds"""
-    return set(select_N_of(population, pick_small_N(odds, len(population))))
+    """Select a small random number of individuals from population with probability of odds
 
+    population is the collection of objects to select among
+    odds is a floating point value between 0 and 1
 
-class User(object):
-    AllUserCount = 0
-
-    def __init__(self, *args, **kwargs):
-        # XXX: this is convenient when we're still figuring out our API
-        #      TODO: get rid of this
-        for attr, value in kwargs.items():
-            setattr(self, attr, value)
-        User.AllUserCount += 1        # XXX: Not Thread Safe
-        self.__id = User.AllUserCount # XXX: Still not thread safe
-        self.features = set()
-        self.coaching = set()
-        self.coached_by = set()
-
-    def __hash__(self):
-        return self.__id
-
-    def __repr__(self):
-        return "<User() {}>".format(self.__id)
-
+    The idea here is that we use odds to determine the discrete number of
+    samples we want, and then we get exactly that number of samples. We could
+    apply a uniform distribution across the population and take everything
+    above or below a threshold, but this works almost as well is more readable.
+    """
+    N = 1
+    range_end = int(odds * len(population))
+    if range_end >= 2:
+        N = random.randint(1, range_end)
+    return set(select_N_of(population, N))
 
 def limited_infection(start_user, max_infections=0):
     """Keep walking across social graph until the entire connected component is infected.
@@ -74,11 +70,11 @@ def limited_infection(start_user, max_infections=0):
         def keyfunc(coach):
             # If we have many coaches, pick the one with the most infected students
             return len( infected_set - coach.coaching )
-        if len(user.coached_by) > 1:
-            coaches = sorted(user.coached_by, key=keyfunc)
+        if len(user.coaches()) > 1:
+            coaches = sorted(user.coaches(), key=keyfunc)
             add_infections = set((coaches.pop(0))).union(user.coaching) - to_infect - infected_set
         else:
-            add_infections = user.coached_by.union(user.coaching) - to_infect - infected_set
+            add_infections = user.coaches().union(user.coaching) - to_infect - infected_set
         to_infect.update(add_infections)
     return infected_set
 
@@ -102,19 +98,20 @@ def total_infection(start_user=None, population=None):
     while len(to_infect) > 0:
         user = to_infect.pop()
         infected_set.add(user)
-        add_infections = user.coached_by.union(user.coaching) - to_infect - infected_set
+        add_infections = user.coaches().union(user.coaching) - to_infect - infected_set
         to_infect.update(add_infections)
     return infected_set
 
 
 class Population(object):
     def __init__(self, users=[]):
-        # XXX: this is intended for manual testing and is very slow
+        # XXX: this is intended for manual testing and is very slow; it's best to 
+        #      initialize an empty users list and use randomize() to get big datasets
         self.N = len(users)
         self.population = users
         self.infected = set([u for u in users if u.features])
         self.coaches = set([u for u in users if u.coaching])
-        self.studying_coaches = set([u for u in users if u.coaching and u.coached_by])
+        self.studying_coaches = set([u for u in users if u.coaching and u.coaches()])
         self.students = set(users) - (self.coaches - self.studying_coaches)
 
     def randomize(self, size, infect_rate=0.02, feature=None, coach_rate=0.1, 
@@ -171,8 +168,7 @@ class Population(object):
             my_coach_count = classes_per_student if classes_per_student else self._random_number_of_coaches(len(my_coach_pool))
             my_coaches = select_N_of(my_coach_pool, my_coach_count)
             for coach in my_coaches:
-                coach.coaching.add(me)
-                me.coached_by.add(coach)
+                me.add_coach(coach)
 
 
 def main():

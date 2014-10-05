@@ -7,7 +7,8 @@ See SPEC.txt for details.
 
 import unittest
 
-from infection import limited_infection, total_infection, User
+from infection import limited_infection, total_infection
+from user import User
 
 
 class LimitedInfectionTestCase(unittest.TestCase):
@@ -33,7 +34,7 @@ class LimitedInfectionTestCase(unittest.TestCase):
         """Limited infection of two users behaves well with different limit requests"""
         A = User()
         B = User()
-        A.coaching.add(B); B.coached_by.add(A)
+        B.add_coach(A)
         infected = limited_infection(A, 1)
         self.assertEqual(set([A]), infected)
         infected = limited_infection(A, 2)
@@ -55,8 +56,8 @@ class LimitedInfectionTestCase(unittest.TestCase):
     def test_two_users_cyclic(self):
         """Cyclic users still behave as expected."""
         A = User(); B = User()
-        A.coaching.add(B); B.coached_by.add(A)
-        A.coached_by.add(B); B.coaching.add(A)
+        B.add_coach(A)
+        A.add_coach(B)
         infected = limited_infection(A, 1)
         self.assertEqual(set([A]), infected)
         infected = limited_infection(A, 2)
@@ -67,8 +68,8 @@ class LimitedInfectionTestCase(unittest.TestCase):
     def test_three_users(self):
         """Limited infection of three users behaves well with different limit requests"""
         A = User(); B = User(); C = User()
-        A.coaching.add(B); B.coached_by.add(A)
-        B.coaching.add(C); C.coached_by.add(B)
+        B.add_coach(A)
+        C.add_coach(B)
         infected = limited_infection(A, 1)
         self.assertEqual(set([A]), infected)
         infected = limited_infection(A, 2)
@@ -98,13 +99,13 @@ class TotalInfectionTestCase(unittest.TestCase):
     def test_two_users_with_relation(self):
         """Total infection of two users infects them both regardless of relationship"""
         A = User(); B = User()
-        A.coaching.add(B); B.coached_by.add(A)
+        B.add_coach(A)
         infected = total_infection(A)
         self.assertEqual(set([A, B]), infected)
-        A.coached_by.add(B); B.coaching.add(A)
+        A.add_coach(B)
         infected = total_infection(A)
         self.assertEqual(set([A, B]), infected)
-        A.coaching.clear(); B.coached_by.clear()
+        A.coaching.clear(); B.coaches().clear()
         infected = total_infection(A)
         self.assertEqual(set([A, B]), infected)
         
@@ -119,12 +120,12 @@ class TotalInfectionTestCase(unittest.TestCase):
     def test_three_users(self):
         """Total infection of three users behaves well with different limit requests"""
         A = User(); B = User(); C = User()
-        A.coaching.add(B); B.coached_by.add(A)
+        B.add_coach(A)
         infected = total_infection(A)
         self.assertEqual(set([A, B]), infected)
         infected = total_infection(C)
         self.assertEqual(set([C]), infected)
-        B.coaching.add(C); C.coached_by.add(B)
+        C.add_coach(B)
         infected = total_infection(A)
         self.assertEqual(set([A, B, C]), infected)
         infected = total_infection(C)
@@ -140,15 +141,15 @@ class TotalInfectionTestCase(unittest.TestCase):
         """Limited infection of count 0 with two users infects them both"""
         A = User()
         B = User()
-        A.coaching.add(B); B.coaching.add(A)
+        B.add_coach(A)
         infected = limited_infection(A, 0)
         self.assertEqual(set([A, B]), infected)
         
     def test_limited_three_users_count0(self):
         """Limited infection of count 0 with three users infects everyone"""
         A = User(); B = User(); C = User()
-        A.coaching.add(B); B.coached_by.add(A)
-        B.coaching.add(C); C.coached_by.add(B)
+        B.add_coach(A)
+        C.add_coach(B)
         infected = limited_infection(B, 0)
         self.assertEqual(set([A, B, C]), infected)
 
