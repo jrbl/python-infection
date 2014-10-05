@@ -10,10 +10,18 @@ def pick_small_N(proportion, pop_size):
     proportion is a floating point value between 0 and 1
     pop_size is an integer >= 1
     """
-    return random.randint(1, int(proportion * pop_size))
+    range_end = int(proportion * pop_size)
+    if range_end == 0:
+        return 0
+    if range_end < 2:
+        return 1
+    return random.randint(1, range_end)
 
 def select_N_of(population, count):
     """Return a set of size count members selected from population"""
+    count = min(count, len(population))
+    if count == 0:
+        return set()
     return set(random.sample(population, count))
 
 def random_small_sample(population, odds):
@@ -29,8 +37,8 @@ class User(object):
         #      TODO: get rid of this
         for attr, value in kwargs.items():
             setattr(self, attr, value)
-        self.__id = self.AllUserCount # XXX: Not thread Safe
-        self.AllUserCount += 1        # XXX: Yep, still not thread safe
+        User.AllUserCount += 1        # XXX: Not Thread Safe
+        self.__id = User.AllUserCount # XXX: Still not thread safe
         self.features = set()
         self.coaching = set()
         self.coached_by = set()
@@ -38,22 +46,52 @@ class User(object):
     def __hash__(self):
         return self.__id
 
+    def __repr__(self):
+        return "<User() {}>".format(self.__id)
+
+
 def limited_infection():
     pass
 
-def total_infection():
-    pass
+def total_infection(start_user=None, population=None, feature="TestFeature"):
+    """Keep walking across social graph until the entire connected component is infected.
+    
+    * start_user is the user from whom to start graph traversal; they will be infected along
+      with everyone reachable from them. If start_user is none, only traverse from the 
+      pre-infected list in population. 
+    * population is an optional Population object collecting a set of users. Use this to 
+      traverse from both the start_user and also from the pre-seeded population infections.
+    * feature is a string denoting what feature we should be infecting users with
+    """
+    to_infect = set()
+    infected_set = set()
+    if start_user is None and population is None:
+        raise ValueError, "Both start_user and population may not be unspecified."
+    if start_user and not population:
+        to_infect.update({start_user})
+    if population and not start_user:
+        to_infect.update(population.infected)
+    while len(to_infect) > 0:
+        user = to_infect.pop()
+        print "popped {}".format(user)
+        infected_set.add(user)
+        to_infect.update((user.coached_by - infected_set))
+        print "enlisting {}".format((user.coached_by - infected_set))
+        to_infect.update((user.coaching - infected_set))
+        print "enlisting {}".format((user.coaching - infected_set))
+    return infected_set
+
 
 class Population(object):
     def __init__(self, size, infect_rate=0.02, feature=None, coach_rate=0.1, 
-                       coach_study_rate=0.5):
+                       coach_study_rate=0.5, initializer=[]):
         """Initialize a population of Users conforming to certaing statistical properties
 
-        size is a population size
-        infect_rate is the rate at which users come pre-infected with some feature
-        feature is an optional string representing the infection we want to model
-        coach_rate is the rough proportion of Users who coach others
-        coach_study_rate is the rough proportion of coaches who also have coaches of their own
+        * size is a population size
+        * infect_rate is the rate at which users come pre-infected with some feature
+        * feature is an optional string representing the infection we want to model
+        * coach_rate is the rough proportion of Users who coach others
+        * coach_study_rate is the rough proportion of coaches who also have coaches of their own
 
         XXX: currently Population only supports modeling one feature at a time, despite 
              Users being able to carry an arbitrary set of features.
@@ -71,7 +109,16 @@ class Population(object):
 
         if feature is not None:
             self.toggle_infections(feature)
-        self.establish_relationships()
+        self.update_user_relationships()
+
+    def manual_init(self, users=[]):
+        # XXX: this is intended for manual testing and very slow
+        self.N = len(users)
+        self.population = users
+        self.infected = set([u for u in users if u.features])
+        self.coaches = set([u for u in users if u.coaching])
+        self.studying_coaches = set([u for u in users if u.coaching and u.coached_by])
+        self.students = set(users) - (self.coaches - self.studying_coaches)
 
     def _random_number_of_coaches(self, max_poolsize):
         # I'm guessing most students take 1 course, and a handful take more
@@ -89,7 +136,7 @@ class Population(object):
             for user in self.population:
                 user.features.clear()
         
-    def establish_relationships(self):
+    def update_user_relationships(self):
         students = self.students
         coaches = self.coaches
         for me in students:
