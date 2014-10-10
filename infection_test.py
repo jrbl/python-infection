@@ -56,15 +56,15 @@ class LimitedInfectionTestCase(unittest.TestCase):
         self.assertEqual(set([A, B]), infected)
         
     def test_two_users_no_relation(self):
-        """Limited infection of two independent users treats them independently"""
+        """Limited infection of independent users keeps trying until its full"""
         A = User()
         B = User()
         infected = limited_infection(A, 1)
         self.assertEqual(set([A]), infected)
         infected = limited_infection(A, 2)
-        self.assertEqual(set([A]), infected)
+        self.assertEqual(set([A, B]), infected)
         infected = limited_infection(B, 1e7)
-        self.assertEqual(set([B]), infected)
+        self.assertEqual(set([A, B]), infected)
 
     def test_two_users_cyclic(self):
         """Cyclic users still behave as expected."""

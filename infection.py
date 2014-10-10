@@ -34,15 +34,19 @@ def limited_infection(start_user, max_infections=0):
     if max_infections == 0:
         return total_infection(start_user=start_user)
     while len(infected_set) < max_infections:
+        #if len(to_infect):
+        #    user = to_infect.pop()
+        #elif len(infected_set) < len( # get a reference to all students
         try:
             user = to_infect.pop()
         except KeyError:
             # pop from empty set means our population is smaller than max_infections
             # so just return whatever we've calculated so far
             return infected_set
+            # bug: 1-node graph (but overage is ok, so fix)
         infected_set.add(user)
         def keyfunc(coach):
-            # If we have many coaches, pick the one with the most infected students
+            # If we have many coaches, pick the one with the least infected students
             return len( infected_set - coach.students() )
         if len(user.coaches()) > 1:
             coaches = sorted(user.coaches(), key=keyfunc)
